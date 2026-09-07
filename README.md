@@ -1,0 +1,94 @@
+# Snippet Vault
+
+Encrypted snippets, AI prompts, passwords and API keys behind one hotkey.
+Windows tray app built with Tauri 2 (Rust core + React UI).
+
+## Use it
+
+| Action | Keys |
+|---|---|
+| Open / close the palette from anywhere | `Ctrl+Shift+Space` |
+| Paste selected item into the app you were in | `Enter` |
+| Copy only (no paste) | `Ctrl+Enter` |
+| Type it as keystrokes (for apps that block paste) | `Alt+Enter` |
+| New item (pre-filled from clipboard) | `Ctrl+N` |
+| Edit selected | `Ctrl+E` |
+| Pin / unpin | `Ctrl+P` |
+| Delete (press twice) | `Delete` |
+| Switch filter All / Text / Prompts / Secrets | `Tab` |
+| Lock the vault | `Ctrl+L` |
+| Clear search, then hide | `Esc` |
+
+The app starts with Windows by default and lives in the tray. Right-click the tray
+icon to turn "Start with Windows" off, lock the vault, or quit.
+
+### Locking
+
+The vault locks itself after 15 minutes without keyboard or mouse activity, when
+Windows locks (Win+L or screen timeout) and when the laptop sleeps. Change these under
+Settings (Ctrl+, inside the palette, or the tray menu).
+
+To unlock, either type the master password or press Enter on the empty field to use
+"Unlock with Windows password". That option keeps a copy of the vault key wrapped by
+Windows Data Protection (DPAPI) for your account and asks Windows to verify your
+account password each time. It is a convenience against people at your keyboard, not
+against malware running as you. Turn it off in Settings if you prefer master-password only.
+
+### Backup and restore
+
+Settings has a Backup section:
+
+- **Encrypted backup** writes one `.svault` file protected by a password you choose
+  (your master password is fine). Same encryption as the vault itself. Keep it on a
+  USB stick or in OneDrive.
+- **Plain export** writes readable JSON, including secrets. Only behind a warning.
+- **Import** reads either file and merges: new items are added, items with the same id
+  keep whichever copy was edited last, nothing is deleted.
+- **Open vault folder** shows where the live vault file is.
+
+Prompts can contain `{{blanks}}`. When you paste one, a small form asks you to fill them in.
+
+Secrets (and anything marked sensitive) are masked in the list, never typed as
+keystrokes, kept out of the Windows clipboard history (Win+V) and cloud clipboard,
+and wiped from the clipboard 30 seconds after a copy.
+
+## Where data lives
+
+`%APPDATA%\com.khatriautomations.snippetvault\vault.db`
+
+Only ciphertext is on disk. Master password -> Argon2id (64 MiB, 3 passes) ->
+wraps a random vault key -> XChaCha20-Poly1305 per record. Back up that one file.
+There is no password recovery.
+
+## Develop
+
+```bash
+pnpm install
+pnpm tauri dev
+```
+
+Tests for the crypto and vault layers:
+
+```bash
+cd src-tauri && cargo test
+```
+
+Release installer (NSIS + MSI in `src-tauri/target/release/bundle/`):
+
+```bash
+pnpm tauri build
+```
+
+## Layout
+
+- `src-tauri/src/crypto.rs`  key derivation, AEAD, key wrapping
+- `src-tauri/src/vault.rs`   SQLite ciphertext store, in-memory index, fuzzy search
+- `src-tauri/src/paste.rs`   Win32 clipboard + focus + SendInput paste engine
+- `src-tauri/src/commands.rs` the only API the UI can call
+- `src-tauri/src/backup.rs`  encrypted .svault and plain JSON export/import
+- `src-tauri/src/winsec.rs`  DPAPI, Windows credential check, lock/sleep/idle watchers
+- `src-tauri/src/settings.rs` settings.json next to the vault
+- `src-tauri/src/lib.rs`     tray, global hotkey, window placement, auto-lock threads
+- `src/`                     React palette, editor, unlock screens
+
+See `PLAN.md` for the roadmap and threat model.
