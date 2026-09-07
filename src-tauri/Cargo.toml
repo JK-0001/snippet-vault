@@ -1,6 +1,6 @@
 [package]
 name = "snippet-vault"
-version = "0.3.0"
+version = "0.3.1"
 description = "Snippet Vault: encrypted snippets, prompts and secrets behind one hotkey"
 authors = ["Jatin Khatri"]
 edition = "2021"

@@ -223,6 +223,23 @@ export function Settings({ onClose, onError, onSaved }: Props) {
       </section>
 
       <section>
+        <h3>Privacy</h3>
+        <label>
+          <input
+            type="checkbox"
+            checked={s.capture_protection}
+            onChange={(e) => setS({ ...s, capture_protection: e.target.checked })}
+          />{" "}
+          Hide this window from screenshots, recordings and screen sharing
+        </label>
+        <p className="hint">
+          Zoom, Teams, OBS, the Snipping Tool and similar see a black box instead of your snippets.
+          Remote Desktop shows it black too, so turn this off if you use the app over RDP or want
+          to show it in a video.
+        </p>
+      </section>
+
+      <section>
         <h3>Text expansion</h3>
         <label>
           <input

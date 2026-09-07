@@ -170,7 +170,7 @@ pub fn settings_get(state: State<AppState>) -> CmdResult<Settings> {
 }
 
 #[tauri::command]
-pub fn settings_set(state: State<AppState>, settings: Settings) -> CmdResult<Settings> {
+pub fn settings_set(app: AppHandle, state: State<AppState>, settings: Settings) -> CmdResult<Settings> {
     settings.save(&state.settings_path()).map_err(err)?;
     {
         let mut s = state.settings.lock().map_err(err)?;
@@ -180,6 +180,7 @@ pub fn settings_set(state: State<AppState>, settings: Settings) -> CmdResult<Set
         settings.expansion_enabled,
         std::sync::atomic::Ordering::Relaxed,
     );
+    crate::apply_capture_protection(&app, settings.capture_protection);
     let path = state.quick_key_path();
     if !settings.quick_unlock {
         let _ = std::fs::remove_file(&path);

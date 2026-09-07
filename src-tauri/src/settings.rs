@@ -24,6 +24,9 @@ pub struct Settings {
     pub clip_secret_policy: String,
     /// Replace typed triggers (e.g. ";sig") with item bodies anywhere.
     pub expansion_enabled: bool,
+    /// Exclude the palette window from screenshots, recordings and screen sharing
+    /// (SetWindowDisplayAffinity WDA_EXCLUDEFROMCAPTURE).
+    pub capture_protection: bool,
 }
 
 impl Default for Settings {
@@ -44,6 +47,7 @@ impl Default for Settings {
             ],
             clip_secret_policy: "mask".into(),
             expansion_enabled: true,
+            capture_protection: true,
         }
     }
 }

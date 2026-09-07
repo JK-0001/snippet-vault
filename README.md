@@ -43,6 +43,12 @@ Windows Data Protection (DPAPI) for your account and asks Windows to verify your
 account password each time. It is a convenience against people at your keyboard, not
 against malware running as you. Turn it off in Settings if you prefer master-password only.
 
+### Screenshot and screen-share protection
+
+The palette window is excluded from screen capture by default: screenshots, screen
+recordings, Zoom/Teams sharing and the Snipping Tool show a black box where the window
+is. Remote Desktop shows it black as well, so there is a switch under Settings > Privacy.
+
 ### Text expansion
 
 Give any snippet, prompt or secret a trigger in its editor, for example `;sig` or

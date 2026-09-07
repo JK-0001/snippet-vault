@@ -67,6 +67,7 @@ export interface Settings {
   clip_ignore_apps: string[];
   clip_secret_policy: "mask" | "skip";
   expansion_enabled: boolean;
+  capture_protection: boolean;
 }
 
 export interface ImportPick {

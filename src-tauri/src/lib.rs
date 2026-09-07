@@ -94,6 +94,15 @@ fn position_near_cursor(app: &AppHandle, w: &tauri::WebviewWindow) {
     let _ = w.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
 }
 
+/// Apply the screenshot / screen-share exclusion flag to the palette window.
+pub fn apply_capture_protection(app: &AppHandle, on: bool) {
+    if let Some(w) = app.get_webview_window("main") {
+        if let Err(e) = w.set_content_protected(on) {
+            log::error!("set_content_protected({on}) failed: {e}");
+        }
+    }
+}
+
 /// Push the current trigger list to the expansion hook (call after any change).
 pub fn sync_triggers(app: &AppHandle) {
     if let Some(state) = app.try_state::<AppState>() {
@@ -318,6 +327,10 @@ pub fn run() {
             }
             build_tray(app.handle())?;
             start_auto_lock(app.handle());
+            apply_capture_protection(
+                app.handle(),
+                app.state::<AppState>().settings().capture_protection,
+            );
             expansion::ENABLED.store(
                 app.state::<AppState>().settings().expansion_enabled,
                 std::sync::atomic::Ordering::Relaxed,
