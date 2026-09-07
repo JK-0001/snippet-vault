@@ -18,6 +18,7 @@ export function Editor({ item, prefill, onCancel, onSaved, onError }: Props) {
   const [pinned, setPinned] = useState(item?.pinned ?? false);
   const [sensitive, setSensitive] = useState(item?.sensitive ?? prefill?.sensitive ?? false);
   const [pasteMode, setPasteMode] = useState<PasteMode>(item?.paste_mode ?? "paste");
+  const [trigger, setTrigger] = useState(item?.trigger ?? "");
   const [showBody, setShowBody] = useState(!(item?.sensitive ?? false));
   const [busy, setBusy] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -42,6 +43,7 @@ export function Editor({ item, prefill, onCancel, onSaved, onError }: Props) {
         pinned,
         sensitive: isSecret,
         paste_mode: pasteMode,
+        trigger: trigger.trim(),
       });
       onSaved();
     } catch (e) {
@@ -112,6 +114,18 @@ export function Editor({ item, prefill, onCancel, onSaved, onError }: Props) {
         <input placeholder="Tags, comma separated" value={tags} onChange={(e) => setTags(e.target.value)} />
         <input placeholder="Folder" value={folder} onChange={(e) => setFolder(e.target.value)} />
       </div>
+      {kind !== "clip" && (
+        <label className="trigger-row">
+          <span>Type-anywhere trigger</span>
+          <input
+            placeholder=";sig"
+            value={trigger}
+            onChange={(e) => setTrigger(e.target.value.replace(/\s+/g, ""))}
+            spellCheck={false}
+          />
+          <span className="hint">Typing this in any app replaces it with the text above. Start it with ; or : so it never fires by accident.</span>
+        </label>
+      )}
 
       <div className="options">
         <label>

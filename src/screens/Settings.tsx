@@ -223,6 +223,22 @@ export function Settings({ onClose, onError, onSaved }: Props) {
       </section>
 
       <section>
+        <h3>Text expansion</h3>
+        <label>
+          <input
+            type="checkbox"
+            checked={s.expansion_enabled}
+            onChange={(e) => setS({ ...s, expansion_enabled: e.target.checked })}
+          />{" "}
+          Replace triggers as I type (for example ;sig becomes your signature)
+        </label>
+        <p className="hint">
+          Set a trigger on any item in its editor. Expansion works only while the vault is unlocked and
+          never inside Snippet Vault itself. Secrets are always pasted, never typed out.
+        </p>
+      </section>
+
+      <section>
         <h3>Startup</h3>
         <label>
           <input type="checkbox" checked={autostart} onChange={(e) => setAutostart(e.target.checked)} />{" "}

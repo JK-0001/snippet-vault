@@ -2,6 +2,7 @@ mod backup;
 mod commands;
 mod crypto;
 mod detect;
+mod expansion;
 mod paste;
 mod settings;
 mod vault;
@@ -93,6 +94,17 @@ fn position_near_cursor(app: &AppHandle, w: &tauri::WebviewWindow) {
     let _ = w.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
 }
 
+/// Push the current trigger list to the expansion hook (call after any change).
+pub fn sync_triggers(app: &AppHandle) {
+    if let Some(state) = app.try_state::<AppState>() {
+        if let Ok(v) = state.vault.lock() {
+            expansion::set_triggers(v.triggers());
+            return;
+        }
+    }
+    expansion::clear();
+}
+
 /// Lock the vault (if unlocked), hide the palette, tell the UI. Safe from any thread.
 pub fn lock_vault(app: &AppHandle, reason: &str) {
     let mut did_lock = false;
@@ -107,6 +119,7 @@ pub fn lock_vault(app: &AppHandle, reason: &str) {
     if did_lock {
         log::info!("vault locked: {reason}");
     }
+    expansion::clear();
     hide_palette(app);
     let _ = app.emit("vault-locked", ());
 }
@@ -305,6 +318,11 @@ pub fn run() {
             }
             build_tray(app.handle())?;
             start_auto_lock(app.handle());
+            expansion::ENABLED.store(
+                app.state::<AppState>().settings().expansion_enabled,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            expansion::start(app.handle().clone());
 
             // Only pop up on the very first run (to create the vault). After that,
             // including when Windows starts it, it stays quietly in the tray.

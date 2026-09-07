@@ -262,3 +262,6 @@ kbd {
 .kind-clip { color: #8fd694; background: rgba(143,214,148,.12); }
 .settings .col-setting { flex-direction: column; align-items: stretch; gap: 4px; }
 .settings .col-setting span { font-size: 12px; color: var(--muted); }
+.badge.trigger { background: rgba(143,214,148,.15); color: #8fd694; text-transform: none; font-family: Consolas, monospace; }
+.trigger-row { display: grid; grid-template-columns: 150px 160px 1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.trigger-row input { font-family: Consolas, monospace; }

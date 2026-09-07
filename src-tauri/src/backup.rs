@@ -140,6 +140,7 @@ mod tests {
             pinned: false,
             sensitive: false,
             paste_mode: PasteMode::Paste,
+            trigger: String::new(),
             use_count: 0,
             last_used: 0,
             created_at: 1,

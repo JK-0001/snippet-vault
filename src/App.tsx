@@ -52,10 +52,34 @@ export default function App() {
       pendingSettings.current = true;
       refreshStatus();
     });
+    const unExpand = listen<string>("expand-with-vars", async (ev) => {
+      try {
+        const full = await api.get(ev.payload, true);
+        const summary: ItemSummary = {
+          id: full.id,
+          kind: full.kind,
+          title: full.title,
+          preview: "",
+          tags: full.tags,
+          folder: full.folder,
+          pinned: full.pinned,
+          sensitive: full.sensitive,
+          paste_mode: full.paste_mode,
+          trigger: full.trigger,
+          use_count: full.use_count,
+          last_used: full.last_used,
+          has_variables: true,
+        };
+        setScreen({ name: "variables", item: summary, body: full.body, mode: "paste" });
+      } catch (e) {
+        setError(String(e));
+      }
+    });
     return () => {
       unShown.then((f) => f());
       unLocked.then((f) => f());
       unSettings.then((f) => f());
+      unExpand.then((f) => f());
     };
   }, [refreshStatus]);
 

@@ -13,6 +13,7 @@ export interface ItemSummary {
   pinned: boolean;
   sensitive: boolean;
   paste_mode: PasteMode;
+  trigger: string;
   use_count: number;
   last_used: number;
   has_variables: boolean;
@@ -28,6 +29,7 @@ export interface Item {
   pinned: boolean;
   sensitive: boolean;
   paste_mode: PasteMode;
+  trigger: string;
   use_count: number;
   last_used: number;
   created_at: number;
@@ -44,6 +46,7 @@ export interface ItemInput {
   pinned: boolean;
   sensitive: boolean;
   paste_mode: PasteMode;
+  trigger?: string;
 }
 
 export interface VaultStatus {
@@ -63,6 +66,7 @@ export interface Settings {
   clip_max_items: number;
   clip_ignore_apps: string[];
   clip_secret_policy: "mask" | "skip";
+  expansion_enabled: boolean;
 }
 
 export interface ImportPick {

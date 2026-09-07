@@ -91,25 +91,32 @@ pub fn vault_status(state: State<AppState>) -> CmdResult<VaultStatus> {
 }
 
 #[tauri::command]
-pub fn vault_create(state: State<AppState>, password: String) -> CmdResult<()> {
-    let mut v = state.vault.lock().map_err(err)?;
-    let pw = zeroize::Zeroizing::new(password);
-    v.create(pw.as_bytes()).map_err(err)?;
-    if state.settings().quick_unlock {
-        write_quick_key(&state, &v);
+pub fn vault_create(app: AppHandle, state: State<AppState>, password: String) -> CmdResult<()> {
+    {
+        let mut v = state.vault.lock().map_err(err)?;
+        let pw = zeroize::Zeroizing::new(password);
+        v.create(pw.as_bytes()).map_err(err)?;
+        if state.settings().quick_unlock {
+            write_quick_key(&state, &v);
+        }
     }
+    crate::sync_triggers(&app);
     Ok(())
 }
 
 #[tauri::command]
-pub fn vault_unlock(state: State<AppState>, password: String) -> CmdResult<usize> {
-    let mut v = state.vault.lock().map_err(err)?;
-    let pw = zeroize::Zeroizing::new(password);
-    v.unlock(pw.as_bytes()).map_err(err)?;
-    if state.settings().quick_unlock {
-        write_quick_key(&state, &v);
-    }
-    Ok(v.item_count())
+pub fn vault_unlock(app: AppHandle, state: State<AppState>, password: String) -> CmdResult<usize> {
+    let n = {
+        let mut v = state.vault.lock().map_err(err)?;
+        let pw = zeroize::Zeroizing::new(password);
+        v.unlock(pw.as_bytes()).map_err(err)?;
+        if state.settings().quick_unlock {
+            write_quick_key(&state, &v);
+        }
+        v.item_count()
+    };
+    crate::sync_triggers(&app);
+    Ok(n)
 }
 
 /// Unlock by proving the Windows account password (no master password typed).
@@ -136,20 +143,22 @@ pub fn vault_quick_unlock(app: AppHandle, state: State<AppState>) -> CmdResult<u
     }
     let blob = std::fs::read(&path).map_err(err)?;
     let key = winsec::dpapi_unprotect(&blob).map_err(err)?;
-    let mut v = state.vault.lock().map_err(err)?;
-    v.unlock_with_key(&key).map_err(|e| {
-        // A stale cache (e.g. vault recreated) is useless; drop it.
-        let _ = std::fs::remove_file(&path);
-        err(e)
-    })?;
-    Ok(v.item_count())
+    let n = {
+        let mut v = state.vault.lock().map_err(err)?;
+        v.unlock_with_key(&key).map_err(|e| {
+            // A stale cache (e.g. vault recreated) is useless; drop it.
+            let _ = std::fs::remove_file(&path);
+            err(e)
+        })?;
+        v.item_count()
+    };
+    crate::sync_triggers(&app);
+    Ok(n)
 }
 
 #[tauri::command]
-pub fn vault_lock(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
-    let mut v = state.vault.lock().map_err(err)?;
-    v.lock();
-    let _ = app.emit("vault-locked", ());
+pub fn vault_lock(app: AppHandle) -> CmdResult<()> {
+    crate::lock_vault(&app, "user");
     Ok(())
 }
 
@@ -167,6 +176,10 @@ pub fn settings_set(state: State<AppState>, settings: Settings) -> CmdResult<Set
         let mut s = state.settings.lock().map_err(err)?;
         *s = settings.clone();
     }
+    crate::expansion::ENABLED.store(
+        settings.expansion_enabled,
+        std::sync::atomic::Ordering::Relaxed,
+    );
     let path = state.quick_key_path();
     if !settings.quick_unlock {
         let _ = std::fs::remove_file(&path);
@@ -217,9 +230,12 @@ pub fn item_get(state: State<AppState>, id: String, reveal: Option<bool>) -> Cmd
 }
 
 #[tauri::command]
-pub fn item_save(state: State<AppState>, input: ItemInput) -> CmdResult<Item> {
-    let mut v = state.vault.lock().map_err(err)?;
-    let mut item = v.save(input).map_err(err)?;
+pub fn item_save(app: AppHandle, state: State<AppState>, input: ItemInput) -> CmdResult<Item> {
+    let mut item = {
+        let mut v = state.vault.lock().map_err(err)?;
+        v.save(input).map_err(err)?
+    };
+    crate::sync_triggers(&app);
     if item.sensitive {
         item.body = String::new();
     }
@@ -227,9 +243,13 @@ pub fn item_save(state: State<AppState>, input: ItemInput) -> CmdResult<Item> {
 }
 
 #[tauri::command]
-pub fn item_delete(state: State<AppState>, id: String) -> CmdResult<()> {
-    let mut v = state.vault.lock().map_err(err)?;
-    v.delete(&id).map_err(err)
+pub fn item_delete(app: AppHandle, state: State<AppState>, id: String) -> CmdResult<()> {
+    {
+        let mut v = state.vault.lock().map_err(err)?;
+        v.delete(&id).map_err(err)?;
+    }
+    crate::sync_triggers(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -399,6 +419,7 @@ pub fn backup_pick_import(app: AppHandle) -> CmdResult<Option<ImportPick>> {
 /// Step 2 of import: read, decrypt if needed, merge.
 #[tauri::command(async)]
 pub fn backup_import(
+    app: AppHandle,
     state: State<AppState>,
     path: String,
     password: Option<String>,
@@ -410,8 +431,11 @@ pub fn backup_import(
     } else {
         backup::from_plain_json(&bytes).map_err(err)?
     };
-    let mut v = state.vault.lock().map_err(err)?;
-    let (added, updated, skipped) = v.import_items(items).map_err(err)?;
+    let (added, updated, skipped) = {
+        let mut v = state.vault.lock().map_err(err)?;
+        v.import_items(items).map_err(err)?
+    };
+    crate::sync_triggers(&app);
     Ok(ImportResult { added, updated, skipped })
 }
 

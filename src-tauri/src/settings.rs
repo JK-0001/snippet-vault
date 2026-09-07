@@ -22,6 +22,8 @@ pub struct Settings {
     pub clip_ignore_apps: Vec<String>,
     /// What to do when a copied text looks like a password or API key: "mask" or "skip".
     pub clip_secret_policy: String,
+    /// Replace typed triggers (e.g. ";sig") with item bodies anywhere.
+    pub expansion_enabled: bool,
 }
 
 impl Default for Settings {
@@ -41,6 +43,7 @@ impl Default for Settings {
                 "snippet-vault.exe".into(),
             ],
             clip_secret_policy: "mask".into(),
+            expansion_enabled: true,
         }
     }
 }

@@ -183,6 +183,7 @@ export function Palette({ onUse, onNew, onEdit, onSettings, onError }: Props) {
               <div className="row-title">
                 {it.pinned && <span className="pin">📌</span>}
                 {it.title}
+                {it.trigger && <span className="badge trigger">{it.trigger}</span>}
                 {it.has_variables && <span className="badge">vars</span>}
                 {it.paste_mode === "copy_only" && <span className="badge">copy</span>}
               </div>

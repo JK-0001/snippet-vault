@@ -75,6 +75,9 @@ pub struct Item {
     pub sensitive: bool,
     #[serde(default = "default_paste_mode")]
     pub paste_mode: PasteMode,
+    /// Optional text-expansion trigger such as ";sig". Empty = none.
+    #[serde(default)]
+    pub trigger: String,
     #[serde(default)]
     pub use_count: u64,
     #[serde(default)]
@@ -99,6 +102,7 @@ pub struct ItemSummary {
     pub pinned: bool,
     pub sensitive: bool,
     pub paste_mode: PasteMode,
+    pub trigger: String,
     pub use_count: u64,
     pub last_used: i64,
     pub has_variables: bool,
@@ -121,6 +125,8 @@ pub struct ItemInput {
     pub sensitive: bool,
     #[serde(default = "default_paste_mode")]
     pub paste_mode: PasteMode,
+    #[serde(default)]
+    pub trigger: String,
 }
 
 pub fn now() -> i64 {
@@ -369,6 +375,24 @@ impl Vault {
             .collect();
         let ts = now();
         let sensitive = input.sensitive || input.kind == ItemKind::Secret;
+        let trigger = input.trigger.trim().to_string();
+        if !trigger.is_empty() {
+            let n = trigger.chars().count();
+            if !(2..=32).contains(&n) || trigger.contains(char::is_whitespace) {
+                return Err(VaultError::Invalid(
+                    "trigger must be 2 to 32 characters with no spaces".into(),
+                ));
+            }
+            let clash = self
+                .items
+                .iter()
+                .any(|i| i.trigger == trigger && input.id.as_deref() != Some(i.id.as_str()));
+            if clash {
+                return Err(VaultError::Invalid(format!(
+                    "another item already uses the trigger {trigger}"
+                )));
+            }
+        }
         let paste_mode = if sensitive && input.paste_mode == PasteMode::Type {
             PasteMode::Paste // never keystroke-inject secrets
         } else {
@@ -391,6 +415,7 @@ impl Vault {
                 existing.pinned = input.pinned;
                 existing.sensitive = sensitive;
                 existing.paste_mode = paste_mode;
+                existing.trigger = trigger;
                 existing.updated_at = ts;
                 existing.clone()
             }
@@ -405,6 +430,7 @@ impl Vault {
                     pinned: input.pinned,
                     sensitive,
                     paste_mode,
+                    trigger,
                     use_count: 0,
                     last_used: 0,
                     created_at: ts,
@@ -466,6 +492,18 @@ impl Vault {
         self.persist(&snapshot)
     }
 
+    /// (trigger, id) for every item with a trigger. Empty when locked.
+    pub fn triggers(&self) -> Vec<(String, String)> {
+        if !self.is_unlocked() {
+            return Vec::new();
+        }
+        self.items
+            .iter()
+            .filter(|i| !i.trigger.is_empty() && i.kind != ItemKind::Clip)
+            .map(|i| (i.trigger.clone(), i.id.clone()))
+            .collect()
+    }
+
     // ---------- clipboard history ----------
 
     /// Record a copied text. Same text already in history: move it to the top.
@@ -510,6 +548,7 @@ impl Vault {
             pinned: false,
             sensitive,
             paste_mode: PasteMode::Paste,
+            trigger: String::new(),
             use_count: 0,
             last_used: ts,
             created_at: ts,
@@ -697,6 +736,7 @@ fn summarize(it: &Item) -> ItemSummary {
         pinned: it.pinned,
         sensitive: it.sensitive,
         paste_mode: it.paste_mode,
+        trigger: it.trigger.clone(),
         use_count: it.use_count,
         last_used: it.last_used,
         has_variables: has_variables(&it.body),
@@ -731,6 +771,7 @@ mod tests {
             pinned: false,
             sensitive: false,
             paste_mode: PasteMode::Paste,
+            trigger: String::new(),
         }
     }
 
@@ -810,6 +851,24 @@ mod tests {
         assert_eq!(all.len(), 1, "All hides clips");
         assert_eq!(v.clear_clips().unwrap(), 3);
         assert_eq!(v.item_count(), 1);
+    }
+
+    #[test]
+    fn triggers_validate_and_list() {
+        let (mut v, _g) = tmp_vault();
+        v.create(b"password-123").unwrap();
+        let mut a = input("Sig", "Regards, J", ItemKind::Text);
+        a.trigger = ";sig".into();
+        let saved = v.save(a).unwrap();
+        assert_eq!(v.triggers(), vec![(";sig".to_string(), saved.id.clone())]);
+        let mut dup = input("Other", "x", ItemKind::Text);
+        dup.trigger = ";sig".into();
+        assert!(v.save(dup).is_err(), "duplicate trigger rejected");
+        let mut bad = input("Bad", "x", ItemKind::Text);
+        bad.trigger = "a b".into();
+        assert!(v.save(bad).is_err(), "whitespace rejected");
+        v.lock();
+        assert!(v.triggers().is_empty());
     }
 
     #[test]

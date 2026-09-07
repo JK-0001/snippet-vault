@@ -43,6 +43,19 @@ Windows Data Protection (DPAPI) for your account and asks Windows to verify your
 account password each time. It is a convenience against people at your keyboard, not
 against malware running as you. Turn it off in Settings if you prefer master-password only.
 
+### Text expansion
+
+Give any snippet, prompt or secret a trigger in its editor, for example `;sig` or
+`:addr`. From then on, typing that trigger in any app deletes it and inserts the item.
+Notes:
+
+- Start triggers with `;` or `:` so they never fire inside normal words.
+- Secrets are always inserted through the clipboard (and wiped afterwards), never typed
+  out key by key. Items set to "Type keystrokes" are typed; the rest are pasted.
+- Prompts with `{{blanks}}` open the fill-in form instead, then paste on Enter.
+- Expansion pauses while the vault is locked and never runs inside Snippet Vault itself.
+- Turn it off under Settings > Text expansion.
+
 ### Clipboard history
 
 While the vault is unlocked, every text you copy in any app is saved as an encrypted
@@ -109,6 +122,7 @@ pnpm tauri build
 - `src-tauri/src/vault.rs`   SQLite ciphertext store, in-memory index, fuzzy search
 - `src-tauri/src/paste.rs`   Win32 clipboard + focus + SendInput paste engine
 - `src-tauri/src/commands.rs` the only API the UI can call
+- `src-tauri/src/expansion.rs` low-level keyboard hook, trigger matching, in-place replace
 - `src-tauri/src/detect.rs`  heuristics for "this copied text is a secret"
 - `src-tauri/src/backup.rs`  encrypted .svault and plain JSON export/import
 - `src-tauri/src/winsec.rs`  DPAPI, Windows credential check, lock/sleep/idle watchers

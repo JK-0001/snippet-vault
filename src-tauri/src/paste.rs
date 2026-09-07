@@ -298,6 +298,19 @@ mod win {
         send(&ups);
     }
 
+    /// Delete n characters to the left of the caret.
+    pub fn send_backspaces(n: usize) {
+        use windows::Win32::UI::Input::KeyboardAndMouse::VK_BACK;
+        let mut batch: Vec<INPUT> = Vec::with_capacity(n * 2);
+        for _ in 0..n {
+            batch.push(key(VK_BACK, false));
+            batch.push(key(VK_BACK, true));
+        }
+        if !batch.is_empty() {
+            send(&batch);
+        }
+    }
+
     pub fn send_ctrl_v() {
         send(&[
             key(VK_CONTROL, false),
@@ -359,6 +372,7 @@ mod other {
         None
     }
     pub fn release_modifiers() {}
+    pub fn send_backspaces(_: usize) {}
     pub fn send_ctrl_v() {}
     pub fn type_text(_: &str) {}
 }
@@ -404,6 +418,39 @@ pub fn deliver(text: &str, mode: Delivery, sensitive: bool) -> Result<(), PasteE
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(RESTORE_DELAY_MS));
                 // Only touch the clipboard if it still holds what we put there.
+                if get_text().as_deref() == Some(ours.as_str()) {
+                    match backup {
+                        Some(prev) => {
+                            let _ = set_text(&prev, false);
+                        }
+                        None => {
+                            let _ = set_text("", true);
+                        }
+                    }
+                }
+            });
+            Ok(())
+        }
+    }
+}
+
+/// Like deliver, but for the window that already has focus (text expansion).
+pub fn deliver_in_place(text: &str, mode: Delivery, sensitive: bool) -> Result<(), PasteError> {
+    match mode {
+        Delivery::Type if !sensitive => {
+            release_modifiers();
+            type_text(text);
+            Ok(())
+        }
+        _ => {
+            let backup = get_text();
+            set_text(text, sensitive)?;
+            release_modifiers();
+            thread::sleep(Duration::from_millis(20));
+            send_ctrl_v();
+            let ours = text.to_string();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(RESTORE_DELAY_MS));
                 if get_text().as_deref() == Some(ours.as_str()) {
                     match backup {
                         Some(prev) => {
