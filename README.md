@@ -1,7 +1,16 @@
 # Snippet Vault
 
 Encrypted snippets, AI prompts, passwords and API keys behind one hotkey.
-Windows tray app built with Tauri 2 (Rust core + React UI).
+Windows tray app built with Tauri 2 (Rust core + React UI). MIT licensed.
+
+## Install
+
+Download the latest `Snippet Vault_x.y.z_x64-setup.exe` (or the `.msi`) from
+[Releases](https://github.com/JK-0001/snippet-vault/releases) and run it.
+
+The installer is not code-signed yet, so Windows SmartScreen shows a warning the
+first time. Click "More info", then "Run anyway". Requires Windows 10 (2004+) or 11
+with the WebView2 runtime, which Windows 11 and most Windows 10 machines already have.
 
 ## Use it
 
@@ -92,3 +101,20 @@ pnpm tauri build
 - `src/`                     React palette, editor, unlock screens
 
 See `PLAN.md` for the roadmap and threat model.
+
+## Status and security notes
+
+Early release, built for personal use. The vault format and crypto design are
+described in `PLAN.md`; the design borrows from KeePassXC and Bitwarden, and the
+paste routine follows PowerToys Advanced Paste and espanso (ideas only, no GPL code).
+Not audited. If you find a security issue, please open an issue or contact the
+author privately first.
+
+## Credits
+
+Ideas and UX patterns from EcoPaste, Ortu, Sklad, CopyQ, Maccy, espanso and
+Microsoft PowerToys. Thanks to the Tauri team for the plugins this app leans on.
+
+## License
+
+MIT. See `LICENSE`.

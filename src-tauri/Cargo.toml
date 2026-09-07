@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Snippet Vault: encrypted snippets, prompts and secrets behind one hotkey"
 authors = ["Jatin Khatri"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/JK-0001/snippet-vault"
 
 [lib]
 name = "snippet_vault_lib"
