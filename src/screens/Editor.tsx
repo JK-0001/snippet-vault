@@ -63,7 +63,7 @@ export function Editor({ item, prefill, onCancel, onSaved, onError }: Props) {
       <div className="editor-head">
         <strong>{item ? "Edit item" : "New item"}</strong>
         <div className="kinds">
-          {(["text", "prompt", "secret"] as ItemKind[]).map((k) => (
+          {((kind === "clip" ? ["clip", "text", "prompt", "secret"] : ["text", "prompt", "secret"]) as ItemKind[]).map((k) => (
             <button
               key={k}
               className={k === kind ? "chip active" : "chip"}
@@ -78,6 +78,12 @@ export function Editor({ item, prefill, onCancel, onSaved, onError }: Props) {
         </div>
       </div>
 
+      {kind === "clip" && (
+        <p className="hint" style={{ margin: 0 }}>
+          This is a clipboard clip; old clips get trimmed automatically. Change the type to Text, Prompt or
+          Secret to keep it for good.
+        </p>
+      )}
       <input ref={titleRef} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
 
       <div className="body-wrap">

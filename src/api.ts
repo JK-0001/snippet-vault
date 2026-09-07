@@ -59,6 +59,10 @@ export interface Settings {
   lock_on_windows_lock: boolean;
   lock_on_sleep: boolean;
   quick_unlock: boolean;
+  clip_history_enabled: boolean;
+  clip_max_items: number;
+  clip_ignore_apps: string[];
+  clip_secret_policy: "mask" | "skip";
 }
 
 export interface ImportPick {
@@ -80,6 +84,7 @@ export const api = {
   backupImport: (path: string, password?: string) =>
     invoke<ImportResult>("backup_import", { path, password: password ?? null }),
   openDataFolder: () => invoke<void>("open_data_folder"),
+  clipsClear: () => invoke<number>("clips_clear"),
   status: () => invoke<VaultStatus>("vault_status"),
   create: (password: string) => invoke<void>("vault_create", { password }),
   unlock: (password: string) => invoke<number>("vault_unlock", { password }),

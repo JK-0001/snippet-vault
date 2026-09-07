@@ -32,14 +32,18 @@ pub enum PasteError {
 #[cfg(windows)]
 mod win {
     use super::*;
-    use windows::core::{w, PCWSTR};
+    use windows::core::{w, PCWSTR, PWSTR};
     use windows::Win32::Foundation::{HANDLE, HGLOBAL, HWND};
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
         OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
     };
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
-    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
+        PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
         VIRTUAL_KEY, VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_RCONTROL, VK_RETURN,
@@ -50,6 +54,16 @@ mod win {
     };
 
     const CF_UNICODETEXT: u32 = 13;
+
+    /// Private clipboard format stamped on everything we write, so the
+    /// history listener can ignore our own pastes and restores.
+    fn own_marker_format() -> u32 {
+        unsafe { RegisterClipboardFormatW(w!("SnippetVaultInternal")) }
+    }
+
+    fn exclude_format() -> u32 {
+        unsafe { RegisterClipboardFormatW(w!("ExcludeClipboardContentFromMonitorProcessing")) }
+    }
 
     pub fn capture_foreground() {
         let hwnd = unsafe { GetForegroundWindow() };
@@ -129,6 +143,10 @@ mod win {
             wide.push(0);
             let bytes = std::slice::from_raw_parts(wide.as_ptr() as *const u8, wide.len() * 2);
             put_hglobal(CF_UNICODETEXT, bytes)?;
+            let marker = own_marker_format();
+            if marker != 0 {
+                let _ = put_hglobal(marker, &1u32.to_le_bytes());
+            }
             if exclude_from_history {
                 let zero = 0u32.to_le_bytes();
                 let names: [PCWSTR; 3] = [
@@ -164,6 +182,57 @@ mod win {
             let s = String::from_utf16_lossy(std::slice::from_raw_parts(p, len));
             let _ = GlobalUnlock(hg);
             Some(s)
+        }
+    }
+
+    /// Clipboard text for the history recorder. None when the clipboard has no
+    /// text, when we wrote it ourselves, or when the writing app asked
+    /// clipboard managers to stay away.
+    pub fn read_for_capture() -> Option<String> {
+        let _guard = open_clipboard_retry().ok()?;
+        unsafe {
+            IsClipboardFormatAvailable(CF_UNICODETEXT).ok()?;
+            let marker = own_marker_format();
+            if marker != 0 && IsClipboardFormatAvailable(marker).is_ok() {
+                return None;
+            }
+            let excl = exclude_format();
+            if excl != 0 && IsClipboardFormatAvailable(excl).is_ok() {
+                return None;
+            }
+            let h = GetClipboardData(CF_UNICODETEXT).ok()?;
+            let hg = HGLOBAL(h.0);
+            let p = GlobalLock(hg) as *const u16;
+            if p.is_null() {
+                return None;
+            }
+            let mut len = 0usize;
+            while *p.add(len) != 0 {
+                len += 1;
+            }
+            let s = String::from_utf16_lossy(std::slice::from_raw_parts(p, len));
+            let _ = GlobalUnlock(hg);
+            Some(s)
+        }
+    }
+
+    /// Executable name (lowercase, e.g. "chrome.exe") of the foreground window.
+    pub fn foreground_app_name() -> Option<String> {
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            if pid == 0 {
+                return None;
+            }
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+            let mut buf = vec![0u16; 1024];
+            let mut len = buf.len() as u32;
+            let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len);
+            let _ = CloseHandle(h);
+            ok.ok()?;
+            let full = String::from_utf16_lossy(&buf[..len as usize]);
+            full.rsplit(['\\', '/']).next().map(|n| n.to_lowercase())
         }
     }
 
@@ -281,6 +350,12 @@ mod other {
         Err(PasteError::Unsupported)
     }
     pub fn get_text() -> Option<String> {
+        None
+    }
+    pub fn read_for_capture() -> Option<String> {
+        None
+    }
+    pub fn foreground_app_name() -> Option<String> {
         None
     }
     pub fn release_modifiers() {}

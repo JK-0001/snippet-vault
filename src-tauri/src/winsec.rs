@@ -15,6 +15,8 @@ pub enum SessionEvent {
     Locked,
     /// Machine is about to sleep or hibernate.
     Suspend,
+    /// Something new is on the clipboard.
+    ClipboardChanged,
 }
 
 #[allow(dead_code)]
@@ -52,6 +54,7 @@ mod win {
     };
     use windows::Win32::System::Com::CoTaskMemFree;
     use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows::Win32::System::DataExchange::AddClipboardFormatListener;
     use windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification;
     use windows::Win32::System::SystemInformation::GetTickCount;
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
@@ -66,6 +69,7 @@ mod win {
     const WTS_SESSION_LOCK: usize = 0x7;
     const WM_POWERBROADCAST: u32 = 0x0218;
     const PBT_APMSUSPEND: usize = 0x4;
+    const WM_CLIPBOARDUPDATE: u32 = 0x031D;
     const NOTIFY_FOR_THIS_SESSION: u32 = 0;
     const CREDUIWIN_GENERIC: u32 = 0x1;
     const CREDUIWIN_ENUMERATE_CURRENT_USER: u32 = 0x200;
@@ -295,6 +299,12 @@ mod win {
                 }
                 LRESULT(1)
             }
+            WM_CLIPBOARDUPDATE => {
+                if let Some(cb) = CALLBACK.get() {
+                    cb(SessionEvent::ClipboardChanged);
+                }
+                LRESULT(0)
+            }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }
@@ -339,6 +349,9 @@ mod win {
             };
             if let Err(e) = WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION) {
                 log::error!("WTSRegisterSessionNotification failed: {e}");
+            }
+            if let Err(e) = AddClipboardFormatListener(hwnd) {
+                log::error!("AddClipboardFormatListener failed: {e}");
             }
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {

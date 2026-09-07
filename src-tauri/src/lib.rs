@@ -1,6 +1,7 @@
 mod backup;
 mod commands;
 mod crypto;
+mod detect;
 mod paste;
 mod settings;
 mod vault;
@@ -177,6 +178,45 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Clipboard recorder: called on every clipboard change (watcher thread).
+fn capture_clip(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let s = state.settings();
+    if !s.clip_history_enabled {
+        return;
+    }
+    // Cannot encrypt while locked; history simply pauses.
+    if !state.vault.lock().map(|v| v.is_unlocked()).unwrap_or(false) {
+        return;
+    }
+    let Some(text) = paste::read_for_capture() else {
+        return;
+    };
+    if text.trim().is_empty() || text.chars().count() > 100_000 {
+        return;
+    }
+    let source = paste::foreground_app_name().unwrap_or_default();
+    if s.clip_ignore_apps.iter().any(|a| a.trim().eq_ignore_ascii_case(&source)) {
+        return;
+    }
+    let secret = detect::looks_secret(&text);
+    if secret && s.clip_secret_policy == "skip" {
+        return;
+    }
+    let text = zeroize::Zeroizing::new(text);
+    let Ok(mut v) = state.vault.lock() else {
+        return;
+    };
+    match v.add_clip(text.to_string(), source, secret, s.clip_max_items) {
+        Ok(_) => {
+            let _ = app.emit("clips-changed", ());
+        }
+        Err(e) => log::error!("clip capture failed: {e}"),
+    }
+}
+
 /// Background watchers: Windows lock screen, sleep, and idle time.
 fn start_auto_lock(app: &AppHandle) {
     let h = app.clone();
@@ -193,6 +233,7 @@ fn start_auto_lock(app: &AppHandle) {
                         lock_vault(&h, "Windows locked")
                     }
                     winsec::SessionEvent::Suspend if s.lock_on_sleep => lock_vault(&h, "sleep"),
+                    winsec::SessionEvent::ClipboardChanged => capture_clip(&h),
                     _ => {}
                 }
             });
@@ -311,6 +352,7 @@ pub fn run() {
             commands::backup_pick_import,
             commands::backup_import,
             commands::open_data_folder,
+            commands::clips_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Snippet Vault");

@@ -422,3 +422,10 @@ pub fn open_data_folder(app: AppHandle, state: State<AppState>) -> CmdResult<()>
         .reveal_item_in_dir(state.data_dir.join("vault.db"))
         .map_err(err)
 }
+
+#[tauri::command]
+pub fn clips_clear(app: AppHandle, state: State<AppState>) -> CmdResult<usize> {
+    let n = state.vault.lock().map_err(err)?.clear_clips().map_err(err)?;
+    let _ = app.emit("clips-changed", ());
+    Ok(n)
+}

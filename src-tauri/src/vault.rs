@@ -466,6 +466,95 @@ impl Vault {
         self.persist(&snapshot)
     }
 
+    // ---------- clipboard history ----------
+
+    /// Record a copied text. Same text already in history: move it to the top.
+    /// Returns true when a new clip was created.
+    pub fn add_clip(
+        &mut self,
+        text: String,
+        source_app: String,
+        sensitive: bool,
+        max_items: usize,
+    ) -> Result<bool> {
+        self.key()?;
+        let ts = now();
+        if let Some(idx) = self
+            .items
+            .iter()
+            .position(|i| i.kind == ItemKind::Clip && i.body == text)
+        {
+            let mut it = self.items.remove(idx);
+            it.created_at = ts;
+            it.updated_at = ts;
+            it.last_used = ts;
+            if !source_app.is_empty() {
+                it.folder = source_app;
+            }
+            self.persist(&it)?;
+            self.items.push(it);
+            return Ok(false);
+        }
+        let first_line = text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+        let mut title: String = first_line.chars().take(80).collect();
+        if title.is_empty() {
+            title = "(blank)".into();
+        }
+        let item = Item {
+            id: uuid::Uuid::new_v4().to_string(),
+            kind: ItemKind::Clip,
+            title,
+            body: text,
+            tags: Vec::new(),
+            folder: source_app,
+            pinned: false,
+            sensitive,
+            paste_mode: PasteMode::Paste,
+            use_count: 0,
+            last_used: ts,
+            created_at: ts,
+            updated_at: ts,
+        };
+        self.persist(&item)?;
+        self.items.push(item);
+        self.trim_clips(max_items)?;
+        Ok(true)
+    }
+
+    fn trim_clips(&mut self, max_items: usize) -> Result<()> {
+        let mut clips: Vec<(i64, usize, String)> = self
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(_, i)| i.kind == ItemKind::Clip && !i.pinned)
+            .map(|(pos, i)| (i.created_at, pos, i.id.clone()))
+            .collect();
+        if clips.len() <= max_items {
+            return Ok(());
+        }
+        clips.sort();
+        let excess = clips.len() - max_items;
+        for (_, _, id) in clips.into_iter().take(excess) {
+            self.delete(&id)?;
+        }
+        Ok(())
+    }
+
+    /// Delete all unpinned clips. Returns how many were removed.
+    pub fn clear_clips(&mut self) -> Result<usize> {
+        self.key()?;
+        let ids: Vec<String> = self
+            .items
+            .iter()
+            .filter(|i| i.kind == ItemKind::Clip && !i.pinned)
+            .map(|i| i.id.clone())
+            .collect();
+        for id in &ids {
+            self.delete(id)?;
+        }
+        Ok(ids.len())
+    }
+
     // ---------- backup ----------
 
     pub fn export_items(&self) -> Result<Vec<Item>> {
@@ -516,21 +605,24 @@ impl Vault {
     ) -> Result<Vec<ItemSummary>> {
         self.key()?;
         let q = query.trim();
+        // With no kind filter, clips stay out of the way (they have their own tab).
+        let matches_kind = |i: &Item| match kind {
+            Some(k) => i.kind == k,
+            None => i.kind != ItemKind::Clip,
+        };
         let mut scored: Vec<(u32, &Item)> = Vec::new();
 
         if q.is_empty() {
-            for it in self
-                .items
-                .iter()
-                .filter(|i| kind.map_or(true, |k| i.kind == k))
-            {
-                scored.push((0, it));
+            for (pos, it) in self.items.iter().enumerate().filter(|(_, i)| matches_kind(i)) {
+                scored.push((pos as u32, it));
             }
+            // Ties (same second) fall back to position: later in the list = newer.
             scored.sort_by(|a, b| {
                 b.1.pinned
                     .cmp(&a.1.pinned)
                     .then(b.1.last_used.cmp(&a.1.last_used))
                     .then(b.1.updated_at.cmp(&a.1.updated_at))
+                    .then(b.0.cmp(&a.0))
             });
         } else {
             let pattern = Pattern::parse(q, CaseMatching::Ignore, Normalization::Smart);
@@ -538,7 +630,7 @@ impl Vault {
             for it in self
                 .items
                 .iter()
-                .filter(|i| kind.map_or(true, |k| i.kind == k))
+                .filter(|i| matches_kind(i))
             {
                 let mut best: Option<u32> = None;
                 let title_hay = format!("{} {} {}", it.title, it.tags.join(" "), it.folder);
@@ -697,6 +789,27 @@ mod tests {
         v.unlock_with_key(&key).unwrap();
         assert_eq!(v.item_count(), 1);
         assert_eq!(v.search("hello", None, 5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn clips_dedupe_trim_and_stay_out_of_all() {
+        let (mut v, _g) = tmp_vault();
+        v.create(b"password-123").unwrap();
+        v.save(input("Snippet", "keep me", ItemKind::Text)).unwrap();
+        assert!(v.add_clip("one".into(), "a.exe".into(), false, 3).unwrap());
+        assert!(v.add_clip("two".into(), "a.exe".into(), false, 3).unwrap());
+        assert!(v.add_clip("three".into(), "a.exe".into(), false, 3).unwrap());
+        assert!(!v.add_clip("one".into(), "b.exe".into(), false, 3).unwrap(), "dedupe");
+        assert!(v.add_clip("four".into(), "a.exe".into(), true, 3).unwrap());
+        let clips = v.search("", Some(ItemKind::Clip), 50).unwrap();
+        assert_eq!(clips.len(), 3, "trimmed to max");
+        assert_eq!(clips[0].title, "four");
+        assert!(clips[0].sensitive);
+        assert!(!clips.iter().any(|c| c.title == "two"), "oldest dropped");
+        let all = v.search("", None, 50).unwrap();
+        assert_eq!(all.len(), 1, "All hides clips");
+        assert_eq!(v.clear_clips().unwrap(), 3);
+        assert_eq!(v.item_count(), 1);
     }
 
     #[test]

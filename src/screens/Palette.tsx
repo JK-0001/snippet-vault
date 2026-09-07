@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { api, type ItemKind, type ItemSummary } from "../api";
 
 interface Props {
@@ -21,6 +22,7 @@ const FILTERS: Array<{ label: string; kind?: ItemKind }> = [
   { label: "Text", kind: "text" },
   { label: "Prompts", kind: "prompt" },
   { label: "Secrets", kind: "secret" },
+  { label: "Clips", kind: "clip" },
 ];
 
 export function Palette({ onUse, onNew, onEdit, onSettings, onError }: Props) {
@@ -49,6 +51,13 @@ export function Palette({ onUse, onNew, onEdit, onSettings, onError }: Props) {
   useEffect(() => {
     const t = setTimeout(load, 40);
     return () => clearTimeout(t);
+  }, [load]);
+
+  useEffect(() => {
+    const un = listen("clips-changed", () => load());
+    return () => {
+      un.then((f) => f());
+    };
   }, [load]);
 
   useEffect(() => {
@@ -100,7 +109,8 @@ export function Palette({ onUse, onNew, onEdit, onSettings, onError }: Props) {
       else api.hide();
     } else if (e.ctrlKey && k.toLowerCase() === "n") {
       e.preventDefault();
-      onNew(FILTERS[filter].kind);
+      const k0 = FILTERS[filter].kind;
+      onNew(k0 === "clip" ? "text" : k0);
     } else if (e.ctrlKey && k.toLowerCase() === "e" && current) {
       e.preventDefault();
       onEdit(current);
@@ -150,10 +160,12 @@ export function Palette({ onUse, onNew, onEdit, onSettings, onError }: Props) {
       <ul className="results" ref={listRef}>
         {items.length === 0 && (
           <li className="empty">
-            {query ? "No matches." : "Nothing here yet."}{" "}
-            <button className="link" onMouseDown={(e) => e.preventDefault()} onClick={() => onNew(FILTERS[filter].kind)}>
-              Create one (Ctrl+N)
-            </button>
+            {query ? "No matches." : FILTERS[filter].kind === "clip" ? "Nothing copied yet. Text you copy anywhere shows up here while the vault is unlocked." : "Nothing here yet."}{" "}
+            {FILTERS[filter].kind !== "clip" && (
+              <button className="link" onMouseDown={(e) => e.preventDefault()} onClick={() => onNew(FILTERS[filter].kind)}>
+                Create one (Ctrl+N)
+              </button>
+            )}
           </li>
         )}
         {items.map((it, i) => (

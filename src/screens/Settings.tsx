@@ -164,6 +164,65 @@ export function Settings({ onClose, onError, onSaved }: Props) {
       </section>
 
       <section>
+        <h3>Clipboard history</h3>
+        <label>
+          <input
+            type="checkbox"
+            checked={s.clip_history_enabled}
+            onChange={(e) => setS({ ...s, clip_history_enabled: e.target.checked })}
+          />{" "}
+          Remember text I copy (encrypted, only while the vault is unlocked)
+        </label>
+        <label className="row-setting">
+          <span>Keep the last</span>
+          <select
+            value={s.clip_max_items}
+            onChange={(e) => setS({ ...s, clip_max_items: Number(e.target.value) })}
+          >
+            {[50, 100, 200, 500, 1000].map((n) => (
+              <option key={n} value={n}>
+                {n} clips
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="row-setting">
+          <span>If a copy looks like a password or key</span>
+          <select
+            value={s.clip_secret_policy}
+            onChange={(e) => setS({ ...s, clip_secret_policy: e.target.value as "mask" | "skip" })}
+          >
+            <option value="mask">save it masked</option>
+            <option value="skip">do not save it</option>
+          </select>
+        </label>
+        <label className="col-setting">
+          <span>Never record copies from these apps (comma separated)</span>
+          <input
+            value={s.clip_ignore_apps.join(", ")}
+            onChange={(e) =>
+              setS({ ...s, clip_ignore_apps: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })
+            }
+            placeholder="keepassxc.exe, bitwarden.exe"
+          />
+        </label>
+        <div className="btn-row">
+          <button
+            className="ghost"
+            disabled={busy}
+            onClick={() =>
+              run("Clear", async () => {
+                const n = await api.clipsClear();
+                return `Removed ${n} clips (pinned ones kept).`;
+              })
+            }
+          >
+            Clear clipboard history
+          </button>
+        </div>
+      </section>
+
+      <section>
         <h3>Startup</h3>
         <label>
           <input type="checkbox" checked={autostart} onChange={(e) => setAutostart(e.target.checked)} />{" "}
