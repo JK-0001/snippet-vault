@@ -52,7 +52,8 @@ pub fn encrypt(items: &[Item], password: &[u8]) -> Result<Vec<u8>, BackupError> 
     let kdf = KdfParams::default();
     let salt = crypto::random_bytes::<SALT_LEN>();
     let key = crypto::derive_master_key(password, &salt, kdf)?;
-    let json = Zeroizing::new(serde_json::to_vec(items).map_err(|e| BackupError::Parse(e.to_string()))?);
+    let json =
+        Zeroizing::new(serde_json::to_vec(items).map_err(|e| BackupError::Parse(e.to_string()))?);
     let blob = crypto::seal(&key, b"backup-v1", &json)?;
     let env = EncryptedEnvelope {
         format: ENCRYPTED_FORMAT.into(),
@@ -71,8 +72,12 @@ pub fn decrypt(bytes: &[u8], password: &[u8]) -> Result<Vec<Item>, BackupError> 
     if env.format != ENCRYPTED_FORMAT {
         return Err(BackupError::NotABackup);
     }
-    let salt = B64.decode(env.salt).map_err(|e| BackupError::Parse(e.to_string()))?;
-    let blob = B64.decode(env.blob).map_err(|e| BackupError::Parse(e.to_string()))?;
+    let salt = B64
+        .decode(env.salt)
+        .map_err(|e| BackupError::Parse(e.to_string()))?;
+    let blob = B64
+        .decode(env.blob)
+        .map_err(|e| BackupError::Parse(e.to_string()))?;
     let key = crypto::derive_master_key(password, &salt, env.kdf)?;
     let json = crypto::open(&key, b"backup-v1", &blob).map_err(|_| BackupError::WrongPassword)?;
     serde_json::from_slice(&json).map_err(|e| BackupError::Parse(e.to_string()))
@@ -102,7 +107,11 @@ pub fn from_plain_json(bytes: &[u8]) -> Result<Vec<Item>, BackupError> {
 pub fn is_encrypted(bytes: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(bytes)
         .ok()
-        .and_then(|v| v.get("format").and_then(|f| f.as_str()).map(|f| f == ENCRYPTED_FORMAT))
+        .and_then(|v| {
+            v.get("format")
+                .and_then(|f| f.as_str())
+                .map(|f| f == ENCRYPTED_FORMAT)
+        })
         .unwrap_or(false)
 }
 
@@ -156,8 +165,14 @@ mod tests {
         assert!(!String::from_utf8_lossy(&bytes).contains("\"title\""));
         let back = decrypt(&bytes, b"backup-pass-1").unwrap();
         assert_eq!(back.len(), 2);
-        assert!(matches!(decrypt(&bytes, b"nope-nope-nope").unwrap_err(), BackupError::WrongPassword));
-        assert!(matches!(encrypt(&items, b"short").unwrap_err(), BackupError::WeakPassword));
+        assert!(matches!(
+            decrypt(&bytes, b"nope-nope-nope").unwrap_err(),
+            BackupError::WrongPassword
+        ));
+        assert!(matches!(
+            encrypt(&items, b"short").unwrap_err(),
+            BackupError::WeakPassword
+        ));
     }
 
     #[test]

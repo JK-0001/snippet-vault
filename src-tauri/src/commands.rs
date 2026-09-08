@@ -170,7 +170,11 @@ pub fn settings_get(state: State<AppState>) -> CmdResult<Settings> {
 }
 
 #[tauri::command]
-pub fn settings_set(app: AppHandle, state: State<AppState>, settings: Settings) -> CmdResult<Settings> {
+pub fn settings_set(
+    app: AppHandle,
+    state: State<AppState>,
+    settings: Settings,
+) -> CmdResult<Settings> {
     settings.save(&state.settings_path()).map_err(err)?;
     {
         let mut s = state.settings.lock().map_err(err)?;
@@ -354,7 +358,11 @@ pub struct ImportResult {
 }
 
 fn save_dialog(app: &AppHandle, filter: (&str, &[&str]), name: &str) -> Option<PathBuf> {
-    let mut d = app.dialog().file().add_filter(filter.0, filter.1).set_file_name(name);
+    let mut d = app
+        .dialog()
+        .file()
+        .add_filter(filter.0, filter.1)
+        .set_file_name(name);
     if let Some(w) = app.get_webview_window("main") {
         d = d.set_parent(&w);
     }
@@ -373,7 +381,12 @@ pub fn backup_export_encrypted(
     password: String,
 ) -> CmdResult<Option<String>> {
     let pw = zeroize::Zeroizing::new(password);
-    let items = state.vault.lock().map_err(err)?.export_items().map_err(err)?;
+    let items = state
+        .vault
+        .lock()
+        .map_err(err)?
+        .export_items()
+        .map_err(err)?;
     let bytes = backup::encrypt(&items, pw.as_bytes()).map_err(err)?;
     let name = format!("snippet-vault-backup-{}.svault", backup::today_stamp());
     let Some(path) = save_dialog(&app, ("Snippet Vault backup", &["svault"]), &name) else {
@@ -386,7 +399,12 @@ pub fn backup_export_encrypted(
 /// Plain JSON export. The UI shows a warning before calling this.
 #[tauri::command(async)]
 pub fn backup_export_plain(app: AppHandle, state: State<AppState>) -> CmdResult<Option<String>> {
-    let items = state.vault.lock().map_err(err)?.export_items().map_err(err)?;
+    let items = state
+        .vault
+        .lock()
+        .map_err(err)?
+        .export_items()
+        .map_err(err)?;
     let bytes = backup::to_plain_json(&items).map_err(err)?;
     let name = format!("snippet-vault-export-{}.json", backup::today_stamp());
     let Some(path) = save_dialog(&app, ("JSON", &["json"]), &name) else {
@@ -437,7 +455,11 @@ pub fn backup_import(
         v.import_items(items).map_err(err)?
     };
     crate::sync_triggers(&app);
-    Ok(ImportResult { added, updated, skipped })
+    Ok(ImportResult {
+        added,
+        updated,
+        skipped,
+    })
 }
 
 #[tauri::command]
@@ -450,7 +472,12 @@ pub fn open_data_folder(app: AppHandle, state: State<AppState>) -> CmdResult<()>
 
 #[tauri::command]
 pub fn clips_clear(app: AppHandle, state: State<AppState>) -> CmdResult<usize> {
-    let n = state.vault.lock().map_err(err)?.clear_clips().map_err(err)?;
+    let n = state
+        .vault
+        .lock()
+        .map_err(err)?
+        .clear_clips()
+        .map_err(err)?;
     let _ = app.emit("clips-changed", ());
     Ok(n)
 }

@@ -53,8 +53,8 @@ mod win {
         LOGON32_PROVIDER_DEFAULT, PSID, TOKEN_QUERY, TOKEN_USER,
     };
     use windows::Win32::System::Com::CoTaskMemFree;
-    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::DataExchange::AddClipboardFormatListener;
+    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification;
     use windows::Win32::System::SystemInformation::GetTickCount;
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
@@ -389,7 +389,11 @@ mod other {
     pub fn dpapi_unprotect(_: &[u8]) -> Result<Zeroizing<Vec<u8>>, WinSecError> {
         Err(WinSecError::Unsupported)
     }
-    pub fn verify_current_user_password(_: &str, _: &str, _: Option<isize>) -> Result<bool, WinSecError> {
+    pub fn verify_current_user_password(
+        _: &str,
+        _: &str,
+        _: Option<isize>,
+    ) -> Result<bool, WinSecError> {
         Err(WinSecError::Unsupported)
     }
     pub fn run_session_watcher(_: impl Fn(SessionEvent) + Send + Sync + 'static) {}

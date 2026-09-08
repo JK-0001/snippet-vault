@@ -43,6 +43,13 @@ Windows Data Protection (DPAPI) for your account and asks Windows to verify your
 account password each time. It is a convenience against people at your keyboard, not
 against malware running as you. Turn it off in Settings if you prefer master-password only.
 
+### Updates
+
+The app checks GitHub for a new version shortly after it starts and every 6 hours.
+When one exists a banner offers "Install and restart". Updates are signed; the app
+refuses anything not signed with the project key. You can also check manually under
+Settings > Updates or from the tray menu.
+
 ### Screenshot and screen-share protection
 
 The palette window is excluded from screen capture by default: screenshots, screen
@@ -116,11 +123,14 @@ Tests for the crypto and vault layers:
 cd src-tauri && cargo test
 ```
 
-Release installer (NSIS + MSI in `src-tauri/target/release/bundle/`):
+Release (builds, signs, writes `latest.json`, creates the GitHub release):
 
 ```bash
-pnpm tauri build
+python scripts/release.py 0.4.0 "release notes here"
 ```
+
+The update-signing key lives in `~/.tauri/snippet-vault.key` on the maintainer
+machine and is never committed. Without it installed copies will not accept an update.
 
 ## Layout
 

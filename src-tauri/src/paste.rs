@@ -33,13 +33,13 @@ pub enum PasteError {
 mod win {
     use super::*;
     use windows::core::{w, PCWSTR, PWSTR};
+    use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::Foundation::{HANDLE, HGLOBAL, HWND};
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
         OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
     };
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
-    use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Threading::{
         AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
         PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -228,7 +228,12 @@ mod win {
             let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
             let mut buf = vec![0u16; 1024];
             let mut len = buf.len() as u32;
-            let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len);
+            let ok = QueryFullProcessImageNameW(
+                h,
+                PROCESS_NAME_WIN32,
+                PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            );
             let _ = CloseHandle(h);
             ok.ok()?;
             let full = String::from_utf16_lossy(&buf[..len as usize]);

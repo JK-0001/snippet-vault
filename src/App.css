@@ -265,3 +265,10 @@ kbd {
 .badge.trigger { background: rgba(143,214,148,.15); color: #8fd694; text-transform: none; font-family: Consolas, monospace; }
 .trigger-row { display: grid; grid-template-columns: 150px 160px 1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
 .trigger-row input { font-family: Consolas, monospace; }
+.update-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; font-size: 12px;
+  background: rgba(124,156,255,.14); border-bottom: 1px solid rgba(124,156,255,.3);
+}
+.update-bar span { flex: 1; }
+.update-bar button { padding: 4px 10px; font-size: 12px; }

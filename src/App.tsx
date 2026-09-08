@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, extractVariables, type Item, type ItemInput, type ItemKind, type ItemSummary } from "./api";
+import {
+  api,
+  extractVariables,
+  type Item,
+  type ItemInput,
+  type ItemKind,
+  type ItemSummary,
+  type UpdateInfo,
+} from "./api";
 import { Palette } from "./screens/Palette";
 import { Editor } from "./screens/Editor";
 import { Unlock } from "./screens/Unlock";
@@ -24,6 +32,9 @@ export default function App() {
   const resetKey = useRef(0);
   const [, force] = useState(0);
   const pendingSettings = useRef(false);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updateState, setUpdateState] = useState<string | null>(null);
+  const dismissedUpdate = useRef<string | null>(null);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -51,6 +62,16 @@ export default function App() {
     const unSettings = listen("open-settings", () => {
       pendingSettings.current = true;
       refreshStatus();
+    });
+    const unUpdate = listen<UpdateInfo>("update-available", (ev) => {
+      if (dismissedUpdate.current !== ev.payload.version) setUpdate(ev.payload);
+    });
+    const unUpdateNone = listen("update-none", () => setToast("You have the latest version"));
+    const unProgress = listen<[number, number | null]>("update-progress", (ev) => {
+      const [done, total] = ev.payload;
+      if (done === Number.MAX_SAFE_INTEGER || done > 1e15) setUpdateState("Installing… the app will restart");
+      else if (total) setUpdateState(`Downloading… ${Math.min(100, Math.round((done / total) * 100))}%`);
+      else setUpdateState("Downloading…");
     });
     const unExpand = listen<string>("expand-with-vars", async (ev) => {
       try {
@@ -80,6 +101,9 @@ export default function App() {
       unLocked.then((f) => f());
       unSettings.then((f) => f());
       unExpand.then((f) => f());
+      unUpdate.then((f) => f());
+      unUpdateNone.then((f) => f());
+      unProgress.then((f) => f());
     };
   }, [refreshStatus]);
 
@@ -150,6 +174,40 @@ export default function App() {
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
+      {update && (
+        <div className="update-bar">
+          <span>
+            Snippet Vault {update.version} is available.
+            {updateState ? " " + updateState : ""}
+          </span>
+          {!updateState && (
+            <>
+              <button
+                onClick={async () => {
+                  setUpdateState("Starting download…");
+                  try {
+                    await api.updateInstall();
+                  } catch (e) {
+                    setUpdateState(null);
+                    setError(String(e));
+                  }
+                }}
+              >
+                Install and restart
+              </button>
+              <button
+                className="ghost"
+                onClick={() => {
+                  dismissedUpdate.current = update.version;
+                  setUpdate(null);
+                }}
+              >
+                Later
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {screen.name === "loading" && <div className="center muted">Loading…</div>}
 

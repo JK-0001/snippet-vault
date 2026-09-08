@@ -81,7 +81,15 @@ export interface ImportResult {
   skipped: number;
 }
 
+export interface UpdateInfo {
+  version: string;
+  notes: string;
+  date: string;
+}
+
 export const api = {
+  updateCheck: () => invoke<UpdateInfo | null>("update_check"),
+  updateInstall: () => invoke<void>("update_install"),
   backupExportEncrypted: (password: string) =>
     invoke<string | null>("backup_export_encrypted", { password }),
   backupExportPlain: () => invoke<string | null>("backup_export_plain"),

@@ -5,6 +5,7 @@ mod detect;
 mod expansion;
 mod paste;
 mod settings;
+mod updater;
 mod vault;
 mod winsec;
 
@@ -143,6 +144,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     )?;
     let lock = MenuItem::with_id(app, "lock", "Lock vault", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+    let update = MenuItem::with_id(app, "update", "Check for updates", true, None::<&str>)?;
     let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
     let autostart = CheckMenuItem::with_id(
         app,
@@ -156,7 +158,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let sep = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&open, &lock, &sep, &settings, &autostart, &sep, &quit],
+        &[&open, &lock, &sep, &settings, &autostart, &update, &sep, &quit],
     )?;
     let autostart_item = autostart.clone();
 
@@ -170,6 +172,22 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "settings" => {
                 show_palette(app);
                 let _ = app.emit("open-settings", ());
+            }
+            "update" => {
+                let h = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    match updater::check(&h).await {
+                        Ok(Some(info)) => {
+                            show_palette(&h);
+                            let _ = h.emit("update-available", info);
+                        }
+                        Ok(None) => {
+                            show_palette(&h);
+                            let _ = h.emit("update-none", ());
+                        }
+                        Err(e) => log::warn!("update check failed: {e}"),
+                    }
+                });
             }
             "autostart" => {
                 let al = app.autolaunch();
@@ -220,7 +238,10 @@ fn capture_clip(app: &AppHandle) {
         return;
     }
     let source = paste::foreground_app_name().unwrap_or_default();
-    if s.clip_ignore_apps.iter().any(|a| a.trim().eq_ignore_ascii_case(&source)) {
+    if s.clip_ignore_apps
+        .iter()
+        .any(|a| a.trim().eq_ignore_ascii_case(&source))
+    {
         return;
     }
     let secret = detect::looks_secret(&text);
@@ -287,6 +308,7 @@ pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_palette(app);
@@ -336,6 +358,7 @@ pub fn run() {
                 std::sync::atomic::Ordering::Relaxed,
             );
             expansion::start(app.handle().clone());
+            updater::start_background(app.handle().clone());
 
             // Only pop up on the very first run (to create the vault). After that,
             // including when Windows starts it, it stays quietly in the tray.
@@ -384,6 +407,8 @@ pub fn run() {
             commands::backup_import,
             commands::open_data_folder,
             commands::clips_clear,
+            updater::update_check,
+            updater::update_install,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Snippet Vault");

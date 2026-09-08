@@ -533,7 +533,11 @@ impl Vault {
             self.items.push(it);
             return Ok(false);
         }
-        let first_line = text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+        let first_line = text
+            .lines()
+            .map(str::trim)
+            .find(|l| !l.is_empty())
+            .unwrap_or("");
         let mut title: String = first_line.chars().take(80).collect();
         if title.is_empty() {
             title = "(blank)".into();
@@ -652,7 +656,12 @@ impl Vault {
         let mut scored: Vec<(u32, &Item)> = Vec::new();
 
         if q.is_empty() {
-            for (pos, it) in self.items.iter().enumerate().filter(|(_, i)| matches_kind(i)) {
+            for (pos, it) in self
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| matches_kind(i))
+            {
                 scored.push((pos as u32, it));
             }
             // Ties (same second) fall back to position: later in the list = newer.
@@ -666,11 +675,7 @@ impl Vault {
         } else {
             let pattern = Pattern::parse(q, CaseMatching::Ignore, Normalization::Smart);
             let mut buf = Vec::new();
-            for it in self
-                .items
-                .iter()
-                .filter(|i| matches_kind(i))
-            {
+            for it in self.items.iter().filter(|i| matches_kind(i)) {
                 let mut best: Option<u32> = None;
                 let title_hay = format!("{} {} {}", it.title, it.tags.join(" "), it.folder);
                 if let Some(s) =
@@ -839,8 +844,13 @@ mod tests {
         v.save(input("Snippet", "keep me", ItemKind::Text)).unwrap();
         assert!(v.add_clip("one".into(), "a.exe".into(), false, 3).unwrap());
         assert!(v.add_clip("two".into(), "a.exe".into(), false, 3).unwrap());
-        assert!(v.add_clip("three".into(), "a.exe".into(), false, 3).unwrap());
-        assert!(!v.add_clip("one".into(), "b.exe".into(), false, 3).unwrap(), "dedupe");
+        assert!(v
+            .add_clip("three".into(), "a.exe".into(), false, 3)
+            .unwrap());
+        assert!(
+            !v.add_clip("one".into(), "b.exe".into(), false, 3).unwrap(),
+            "dedupe"
+        );
         assert!(v.add_clip("four".into(), "a.exe".into(), true, 3).unwrap());
         let clips = v.search("", Some(ItemKind::Clip), 50).unwrap();
         assert_eq!(clips.len(), 3, "trimmed to max");

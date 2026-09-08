@@ -29,6 +29,9 @@ importers:
       '@tauri-apps/plugin-positioner':
         specifier: ~2.3.4
         version: 2.3.4
+      '@tauri-apps/plugin-updater':
+        specifier: ~2.11.0
+        version: 2.11.0
       react:
         specifier: ^19.1.0
         version: 19.2.8
@@ -244,6 +247,9 @@ packages:
 
   '@tauri-apps/plugin-positioner@2.3.4':
     resolution: {integrity: sha512-Orl+BWL/93OuxaL8FE/5tk7RuRyGMfEQX6E2fDsErFaahHCYq/REFByRBm8oWzw7bIfWdlOY/B6CZMcYgC+crg==}
+
+  '@tauri-apps/plugin-updater@2.11.0':
+    resolution: {integrity: sha512-AE36XkOoSna24G40jZMY15nzAnkXEPL/73tGoseGrtGOHuI/cZwWzHpZFLjKXDPgzYZ435z1gHu28LgrsBwIxQ==}
 
   '@types/react-dom@19.2.7':
     resolution: {integrity: sha512-I8bPpDLcHBv1qiIiXDCy71Rt8eQDKJP0sMSWJphDdAcdqiJ1sGpZamavoEIRZmYzjia9LuEb2HlYdDpmoENpvQ==}
@@ -570,6 +576,10 @@ snapshots:
       '@tauri-apps/api': 2.11.1
 
   '@tauri-apps/plugin-positioner@2.3.4':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
+  '@tauri-apps/plugin-updater@2.11.0':
     dependencies:
       '@tauri-apps/api': 2.11.1
 

@@ -264,6 +264,25 @@ export function Settings({ onClose, onError, onSaved }: Props) {
       </section>
 
       <section>
+        <h3>Updates</h3>
+        <div className="btn-row">
+          <button
+            className="ghost"
+            disabled={busy}
+            onClick={() =>
+              run("Update check", async () => {
+                const u = await api.updateCheck();
+                return u ? `Version ${u.version} is available. Use the banner at the top to install.` : "You have the latest version.";
+              })
+            }
+          >
+            Check for updates now
+          </button>
+        </div>
+        <p className="hint">Snippet Vault checks GitHub for signed updates shortly after start and every 6 hours.</p>
+      </section>
+
+      <section>
         <h3>Backup</h3>
         <div className="btn-row">
           <button className="ghost" disabled={busy} onClick={() => setAskBackupPw((v) => !v)}>

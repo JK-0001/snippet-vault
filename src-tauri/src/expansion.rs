@@ -24,8 +24,10 @@ struct Fire {
 static TX: OnceLock<Mutex<mpsc::Sender<Fire>>> = OnceLock::new();
 
 pub fn set_triggers(list: Vec<(String, String)>) {
-    let mut v: Vec<(Vec<char>, String)> =
-        list.into_iter().map(|(t, id)| (t.chars().collect(), id)).collect();
+    let mut v: Vec<(Vec<char>, String)> = list
+        .into_iter()
+        .map(|(t, id)| (t.chars().collect(), id))
+        .collect();
     v.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
     if let Ok(mut g) = TRIGGERS.write() {
         *g = v;
@@ -93,9 +95,8 @@ mod win {
     use windows::Win32::System::Threading::GetCurrentProcessId;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         GetAsyncKeyState, GetKeyState, GetKeyboardLayout, ToUnicodeEx, VIRTUAL_KEY, VK_BACK,
-        VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT,
-        VK_LWIN, VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_RWIN, VK_SHIFT, VK_TAB,
-        VK_UP,
+        VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_LWIN,
+        VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_RWIN, VK_SHIFT, VK_TAB, VK_UP,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         CallNextHookEx, DispatchMessageW, GetForegroundWindow, GetMessageW,
@@ -171,7 +172,14 @@ mod win {
         };
         let mut out = [0u16; 8];
         let n = unsafe {
-            ToUnicodeEx(vk, scan, &state, &mut out, TOUNICODE_NO_STATE_CHANGE, Some(layout))
+            ToUnicodeEx(
+                vk,
+                scan,
+                &state,
+                &mut out,
+                TOUNICODE_NO_STATE_CHANGE,
+                Some(layout),
+            )
         };
         if n <= 0 {
             return; // dead key or no character
@@ -190,7 +198,10 @@ mod win {
         if let Ok(triggers) = TRIGGERS.read() {
             for (t, id) in triggers.iter() {
                 if buf.len() >= t.len() && buf[buf.len() - t.len()..] == t[..] {
-                    let f = Fire { trigger_len: t.len(), item_id: id.clone() };
+                    let f = Fire {
+                        trigger_len: t.len(),
+                        item_id: id.clone(),
+                    };
                     buf.clear();
                     drop(triggers);
                     fire(f);
