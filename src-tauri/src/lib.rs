@@ -1,3 +1,4 @@
+mod autostart;
 mod backup;
 mod commands;
 mod crypto;
@@ -18,7 +19,6 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, WindowEvent,
 };
-use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 pub const HOTKEY_LABEL: &str = "Ctrl+Shift+Space";
@@ -145,7 +145,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let lock = MenuItem::with_id(app, "lock", "Lock vault", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let update = MenuItem::with_id(app, "update", "Check for updates", true, None::<&str>)?;
-    let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
+    let autostart_on = autostart::is_enabled();
     let autostart = CheckMenuItem::with_id(
         app,
         "autostart",
@@ -190,13 +190,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 });
             }
             "autostart" => {
-                let al = app.autolaunch();
-                let now_on = al.is_enabled().unwrap_or(false);
-                let result = if now_on { al.disable() } else { al.enable() };
-                if let Err(e) = result {
+                if let Err(e) = set_autostart(app, !autostart::is_enabled()) {
                     log::error!("autostart toggle failed: {e}");
                 }
-                let _ = autostart_item.set_checked(al.is_enabled().unwrap_or(false));
+                let _ = autostart_item.set_checked(autostart::is_enabled());
             }
             "quit" => app.exit(0),
             _ => {}
@@ -303,9 +300,59 @@ fn start_auto_lock(app: &AppHandle) {
         .ok();
 }
 
+/// Marker file written when the user turns autostart off, so we do not
+/// re-enable it on every launch.
+fn autostart_optout_path(dir: &std::path::Path) -> std::path::PathBuf {
+    dir.join("autostart.off")
+}
+
+fn settings_disabled_autostart(dir: &std::path::Path) -> bool {
+    autostart_optout_path(dir).exists()
+}
+
+pub fn set_autostart(app: &AppHandle, enabled: bool) -> Result<bool, String> {
+    let dir = data_dir(app);
+    let marker = autostart_optout_path(&dir);
+    if enabled {
+        autostart::enable()?;
+        let _ = std::fs::remove_file(&marker);
+    } else {
+        autostart::disable()?;
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(&marker, b"user turned off start-with-windows");
+    }
+    Ok(autostart::is_enabled())
+}
+
+/// Logs go to stderr and to %APPDATA%\<id>\snippet-vault.log (kept under ~1 MB).
+fn init_logging() {
+    let mut builder =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        let dir = std::path::PathBuf::from(appdata).join("com.khatriautomations.snippetvault");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("snippet-vault.log");
+        if std::fs::metadata(&path).map(|m| m.len() > 1_000_000).unwrap_or(false) {
+            let _ = std::fs::remove_file(&path);
+        }
+        if let Ok(file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+            builder.target(env_logger::Target::Pipe(Box::new(file)));
+        }
+    }
+    let _ = builder.try_init();
+    std::panic::set_hook(Box::new(|info| {
+        log::error!("PANIC: {info}");
+    }));
+    log::info!(
+        "Snippet Vault {} starting, args: {:?}",
+        env!("CARGO_PKG_VERSION"),
+        std::env::args().skip(1).collect::<Vec<_>>()
+    );
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    init_logging();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -313,7 +360,6 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_palette(app);
         }))
-        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(
@@ -330,6 +376,7 @@ pub fn run() {
             let vault_path = dir.join("vault.db");
             log::info!("data dir: {}", dir.display());
             let first_run = !vault_path.exists();
+            let dir_for_marker = dir.clone();
             let settings = settings::Settings::load(&dir.join("settings.json"));
             app.manage(AppState {
                 vault: Mutex::new(vault::Vault::new(vault_path)),
@@ -341,12 +388,13 @@ pub fn run() {
                 log::error!("could not register {HOTKEY_LABEL}: {e}");
             }
             // Start with Windows by default; the tray menu can turn it off.
-            let al = app.handle().autolaunch();
-            if !al.is_enabled().unwrap_or(false) {
-                if let Err(e) = al.enable() {
+            // Also rewrites a broken entry left by older versions.
+            if first_run || !autostart::is_enabled() && !settings_disabled_autostart(&dir_for_marker) {
+                if let Err(e) = autostart::enable() {
                     log::error!("could not enable autostart: {e}");
                 }
             }
+            autostart::repair_if_needed();
             build_tray(app.handle())?;
             start_auto_lock(app.handle());
             apply_capture_protection(

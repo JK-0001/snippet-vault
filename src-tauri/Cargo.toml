@@ -1,6 +1,6 @@
 [package]
 name = "snippet-vault"
-version = "0.4.0"
+version = "0.4.1"
 description = "Snippet Vault: encrypted snippets, prompts and secrets behind one hotkey"
 authors = ["Jatin Khatri"]
 edition = "2021"
@@ -40,7 +40,6 @@ base64 = "0.22"
 regex = "1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-positioner = "2"
 tauri-plugin-single-instance = "2"

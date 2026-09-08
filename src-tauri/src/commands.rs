@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_autostart::ManagerExt;
 
 pub struct AppState {
     pub vault: Mutex<Vault>,
@@ -199,15 +198,13 @@ pub fn settings_set(
 }
 
 #[tauri::command]
-pub fn autostart_get(app: AppHandle) -> CmdResult<bool> {
-    app.autolaunch().is_enabled().map_err(err)
+pub fn autostart_get() -> CmdResult<bool> {
+    Ok(crate::autostart::is_enabled())
 }
 
 #[tauri::command]
 pub fn autostart_set(app: AppHandle, enabled: bool) -> CmdResult<bool> {
-    let al = app.autolaunch();
-    if enabled { al.enable() } else { al.disable() }.map_err(err)?;
-    al.is_enabled().map_err(err)
+    crate::set_autostart(&app, enabled)
 }
 
 // ---------- items ----------
